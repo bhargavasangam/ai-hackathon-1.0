@@ -29,6 +29,7 @@
     }
     input[type="number"] {
       width: 100px;
+      margin-right: 5px;
     }
     .solve-btn {
       margin: 1em 0;
@@ -39,9 +40,15 @@
       border-radius: 5px;
       background: #eee;
     }
-    .output {
-      margin-top: 1em;
-      font-weight: bold;
+    textarea#solutionBox {
+      width: 100%;
+      height: 150px;
+      font-family: monospace;
+      font-size: 1em;
+      margin-top: 0.5em;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      resize: vertical;
     }
   </style>
 </head>
@@ -50,15 +57,11 @@
 <div class="section">
   <h1>Interactive LP: Concrete & Steel Procurement</h1>
   <p>
-    This page demonstrates a **Linear Programming** example where you must buy 
+    This example uses <strong>glpk.js</strong> to solve a small Linear Programming 
+    problem <em>in the browser</em>. You must purchase 
     <strong>Concrete</strong> and <strong>Steel</strong> from two suppliers (X and Y) 
-    to meet the demand for a final product. Each product unit needs a certain amount 
-    of Concrete and Steel, and there's a limit to how much you can store on-site 
-    (all raw materials combined). 
-    <br><br>
-    Adjust the inputs below, then click <strong>Solve LP</strong> to see the 
-    optimal purchasing plan and total cost, computed via <strong>glpk.js</strong> 
-    directly in your browser.
+    to meet demand for a final product. There’s also a site storage limit. 
+    Modify the inputs below, then click <strong>Solve LP</strong>.
   </p>
 </div>
 
@@ -134,7 +137,9 @@
   <hr>
 
   <button class="solve-btn" id="solveBtn">Solve LP</button>
-  <div id="solution" class="output"></div>
+
+  <h3>Solution Output:</h3>
+  <textarea id="solutionBox" readonly></textarea>
 </div>
 
 <!-- glpk.js from CDN -->
@@ -142,34 +147,34 @@
 
 <script>
   /*
-    We'll define variables:
+    We'll define these variables for clarity:
       x_XC : Concrete from Supplier X
       x_XS : Steel    from Supplier X
       x_YC : Concrete from Supplier Y
       x_YS : Steel    from Supplier Y
 
-    Our objective is to minimize:
-      (cost X concrete)*x_XC + (cost X steel)*x_XS +
-      (cost Y concrete)*x_YC + (cost Y steel)*x_YS
+    Our objective: minimize cost =
+      (cost of Concrete X) * x_XC +
+      (cost of Steel X)    * x_XS +
+      (cost of Concrete Y) * x_YC +
+      (cost of Steel Y)    * x_YS
 
     Constraints:
-      1) Concrete demand: x_XC + x_YC >= (concretePerProd * numUnits)
-      2) Steel demand:    x_XS + x_YS >= (steelPerProd * numUnits)
-      3) Supplier X capacity:
-         x_XC <= xCapConcrete
-         x_XS <= xCapSteel
-      4) Supplier Y capacity:
-         x_YC <= yCapConcrete
-         x_YS <= yCapSteel
-      5) Storage limit:
-         x_XC + x_XS + x_YC + x_YS <= siteStorage
+      1) Concrete demand: x_XC + x_YC >= concretePerProd * numUnits
+      2) Steel demand:    x_XS + x_YS >= steelPerProd * numUnits
+      3) Supplier X capacity: x_XC <= xCapConcrete, x_XS <= xCapSteel
+      4) Supplier Y capacity: x_YC <= yCapConcrete, x_YS <= yCapSteel
+      5) Storage limit: x_XC + x_XS + x_YC + x_YS <= siteStorage
       6) Non-negativity
   */
 
-  const solveBtn = document.getElementById('solveBtn');
-  const solutionDiv = document.getElementById('solution');
+  const solveBtn     = document.getElementById('solveBtn');
+  const solutionBox  = document.getElementById('solutionBox');
 
   solveBtn.addEventListener('click', () => {
+    // Clear old content
+    solutionBox.value = "Solving... please wait.";
+
     // 1) Read user inputs
     const numUnits         = parseFloat(document.getElementById('numUnits').value);
     const concretePerProd  = parseFloat(document.getElementById('concretePerProd').value);
@@ -188,10 +193,10 @@
     const siteStorage      = parseFloat(document.getElementById('siteStorage').value);
 
     // 2) Compute total needed
-    const totalConcreteRequired = concretePerProd * numUnits; // e.g. 2 * 1000 = 2000
-    const totalSteelRequired    = steelPerProd * numUnits;    // e.g. 1 * 1000 = 1000
+    const totalConcreteRequired = concretePerProd * numUnits;
+    const totalSteelRequired    = steelPerProd * numUnits;
 
-    // 3) Construct glpk.js problem
+    // 3) Build LP problem for glpk.js
     const lpProblem = {
       name: "ConcreteSteelProcurement",
       objective: {
@@ -229,6 +234,84 @@
             val: totalSteelRequired
           }
         },
-        // Supplier
+        // Supplier X capacity
+        {
+          name: "X_ConcreteCap",
+          vars: [{ name: "x_XC", coef: 1 }],
+          bnds: { type: glpk.GLP_UP, val: xCapConcrete }
+        },
+        {
+          name: "X_SteelCap",
+          vars: [{ name: "x_XS", coef: 1 }],
+          bnds: { type: glpk.GLP_UP, val: xCapSteel }
+        },
+        // Supplier Y capacity
+        {
+          name: "Y_ConcreteCap",
+          vars: [{ name: "x_YC", coef: 1 }],
+          bnds: { type: glpk.GLP_UP, val: yCapConcrete }
+        },
+        {
+          name: "Y_SteelCap",
+          vars: [{ name: "x_YS", coef: 1 }],
+          bnds: { type: glpk.GLP_UP, val: yCapSteel }
+        },
+        // Storage capacity
+        {
+          name: "StorageLimit",
+          vars: [
+            { name: "x_XC", coef: 1 },
+            { name: "x_XS", coef: 1 },
+            { name: "x_YC", coef: 1 },
+            { name: "x_YS", coef: 1 }
+          ],
+          bnds: {
+            type: glpk.GLP_UP, // <=
+            val: siteStorage
+          }
+        }
+      ],
+      bounds: [
+        // Non-negativity
+        { name: "x_XC", type: glpk.GLP_LO, val: 0 },
+        { name: "x_XS", type: glpk.GLP_LO, val: 0 },
+        { name: "x_YC", type: glpk.GLP_LO, val: 0 },
+        { name: "x_YS", type: glpk.GLP_LO, val: 0 }
+      ]
+    };
 
+    // 4) Solve the LP
+    let result;
+    try {
+      result = glpk.solve(lpProblem);
+    } catch (err) {
+      console.error("GLPK solve error:", err);
+      solutionBox.value = "Error solving the LP problem. Check the console for details.";
+      return;
+    }
 
+    // 5) Display results
+    if (result && result.result) {
+      const x_XC_val = result.result.x_XC?.toFixed(2) || "0";
+      const x_XS_val = result.result.x_XS?.toFixed(2) || "0";
+      const x_YC_val = result.result.x_YC?.toFixed(2) || "0";
+      const x_YS_val = result.result.x_YS?.toFixed(2) || "0";
+      const totalCost = (result.result.z || 0).toFixed(2);
+
+      solutionBox.value =
+        "Optimal Purchase Plan:\n\n" +
+        `Supplier X:\n` +
+        `  Concrete = ${x_XC_val} kg\n` +
+        `  Steel    = ${x_XS_val} kg\n\n` +
+        `Supplier Y:\n` +
+        `  Concrete = ${x_YC_val} kg\n` +
+        `  Steel    = ${x_YS_val} kg\n\n` +
+        `Minimum Total Cost = $${totalCost}`;
+    } else {
+      solutionBox.value = "No feasible solution found or an error occurred.";
+    }
+  });
+</script>
+
+</body>
+</html>
