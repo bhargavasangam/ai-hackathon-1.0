@@ -1,171 +1,291 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Linear Programming Example: Procurement Problem</title>
+  <meta charset="UTF-8">
+  <title>Interactive LP Solver (glpk.js)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
-      background: #f9f9f9;
+      margin: 2em;
+      background-color: #fafafa;
     }
-    h1, h2, h3 {
+    h1 {
       margin-bottom: 0.5em;
-    }
-    .code-block {
-      background: #eee;
-      padding: 10px;
-      border-radius: 5px;
-      font-family: "Courier New", monospace;
-      overflow-x: auto;
     }
     .section {
       background: #fff;
-      margin-bottom: 20px;
-      padding: 15px;
+      margin-bottom: 1.5em;
+      padding: 1em;
       border-radius: 5px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .input-row {
+      margin-bottom: 0.5em;
+    }
+    label {
+      display: inline-block;
+      width: 280px;
+      font-weight: bold;
+    }
+    input[type="number"] {
+      width: 100px;
+    }
+    .solve-btn {
+      margin: 1em 0;
+      padding: 0.5em 1em;
+      font-size: 1em;
+      cursor: pointer;
+    }
+    .output {
+      margin-top: 1em;
+      font-weight: bold;
+    }
+    .code-link {
+      display: inline-block;
+      margin-top: 1em;
     }
   </style>
 </head>
 <body>
 
-  <!-- Title Section -->
-  <div class="section">
-    <h1>Linear Programming Example</h1>
-    <p>This page illustrates a simple Linear Programming (LP) problem for a procurement scenario, showing how to model and solve it using the PuLP library in Python.</p>
+<!-- Title / Description -->
+<div class="section">
+  <h1>Interactive Linear Programming Solver (Browser-based)</h1>
+  <p>
+    This page demonstrates how to solve a small LP in the browser using <strong>glpk.js</strong>. 
+    You can adjust costs, capacities, and demand in the fields below, then click 
+    <em>Solve LP</em> to compute the optimal purchase plan.
+  </p>
+  <p>
+    The scenario: We need to buy <strong>Material A</strong> and <strong>Material B</strong> 
+    from two suppliers (X and Y) to meet the demand for our final product. 
+    Each product unit requires some amount of A and B. 
+    We aim to <strong>minimize total cost</strong>.
+  </p>
+</div>
+
+<!-- Input Form -->
+<div class="section">
+  <h2>1. Model Inputs</h2>
+  
+  <!-- Demand + Materials per unit -->
+  <div class="input-row">
+    <label for="numUnits">Final Product Demand (units):</label>
+    <input type="number" id="numUnits" value="1000" min="0">
+  </div>
+  <div class="input-row">
+    <label for="matAReq">Material A per product (kg/unit):</label>
+    <input type="number" id="matAReq" value="2" min="0">
+  </div>
+  <div class="input-row">
+    <label for="matBReq">Material B per product (kg/unit):</label>
+    <input type="number" id="matBReq" value="1" min="0">
   </div>
 
-  <!-- Problem Statement Section -->
-  <div class="section">
-    <h2>1. Problem Statement</h2>
-    <p>Our small manufacturing company needs two raw materials (A and B) to produce a final product. We have two suppliers (X and Y) for each material, each with specific costs and capacity limits.</p>
-    
-    <ul>
-      <li>We must produce at least <strong>1,000 units</strong> of the final product each month.</li>
-      <li>Each unit of the product requires <strong>2 kg</strong> of Material A and <strong>1 kg</strong> of Material B.</li>
-      <li>Supplier X can provide up to <strong>1,600 kg of Material A</strong> and <strong>800 kg of Material B</strong>.</li>
-      <li>Supplier Y can provide up to <strong>2,000 kg of Material A</strong> and <strong>500 kg of Material B</strong>.</li>
-      <li>Costs per kg:
+  <hr>
+
+  <!-- Supplier X capacities + costs -->
+  <h3>Supplier X</h3>
+  <div class="input-row">
+    <label for="xCapA">Capacity for A (kg):</label>
+    <input type="number" id="xCapA" value="1600" min="0">
+  </div>
+  <div class="input-row">
+    <label for="xCapB">Capacity for B (kg):</label>
+    <input type="number" id="xCapB" value="800" min="0">
+  </div>
+  <div class="input-row">
+    <label for="xCostA">Cost of A ($/kg):</label>
+    <input type="number" id="xCostA" value="10" step="0.1" min="0">
+  </div>
+  <div class="input-row">
+    <label for="xCostB">Cost of B ($/kg):</label>
+    <input type="number" id="xCostB" value="20" step="0.1" min="0">
+  </div>
+
+  <hr>
+
+  <!-- Supplier Y capacities + costs -->
+  <h3>Supplier Y</h3>
+  <div class="input-row">
+    <label for="yCapA">Capacity for A (kg):</label>
+    <input type="number" id="yCapA" value="2000" min="0">
+  </div>
+  <div class="input-row">
+    <label for="yCapB">Capacity for B (kg):</label>
+    <input type="number" id="yCapB" value="500" min="0">
+  </div>
+  <div class="input-row">
+    <label for="yCostA">Cost of A ($/kg):</label>
+    <input type="number" id="yCostA" value="9" step="0.1" min="0">
+  </div>
+  <div class="input-row">
+    <label for="yCostB">Cost of B ($/kg):</label>
+    <input type="number" id="yCostB" value="22" step="0.1" min="0">
+  </div>
+
+  <hr>
+
+  <button class="solve-btn" id="solveBtn">Solve LP</button>
+  <div id="solution" class="output"></div>
+</div>
+
+<!-- Include glpk.js from a CDN -->
+<script src="https://cdn.jsdelivr.net/npm/glpk.js@0.19.2/dist/glpk.min.js"></script>
+
+<script>
+  /*
+    We'll build the LP model dynamically based on the user's inputs.
+    Then we'll call glpk.solve() to get the optimal purchase plan
+    (x_XA, x_XB, x_YA, x_YB).
+  */
+
+  // Grab DOM elements
+  const solveBtn = document.getElementById('solveBtn');
+  const solutionDiv = document.getElementById('solution');
+
+  solveBtn.addEventListener('click', () => {
+    // 1) Read user inputs
+    const numUnits = parseFloat(document.getElementById('numUnits').value);
+    const matAReq = parseFloat(document.getElementById('matAReq').value);
+    const matBReq = parseFloat(document.getElementById('matBReq').value);
+
+    const xCapA = parseFloat(document.getElementById('xCapA').value);
+    const xCapB = parseFloat(document.getElementById('xCapB').value);
+    const xCostA = parseFloat(document.getElementById('xCostA').value);
+    const xCostB = parseFloat(document.getElementById('xCostB').value);
+
+    const yCapA = parseFloat(document.getElementById('yCapA').value);
+    const yCapB = parseFloat(document.getElementById('yCapB').value);
+    const yCostA = parseFloat(document.getElementById('yCostA').value);
+    const yCostB = parseFloat(document.getElementById('yCostB').value);
+
+    // 2) Compute total A & B needed to produce 'numUnits' of the final product
+    const totalARequired = matAReq * numUnits;  // e.g. 2 * 1000 = 2000 kg
+    const totalBRequired = matBReq * numUnits;  // e.g. 1 * 1000 = 1000 kg
+
+    // 3) Define the LP in a format glpk.js can process
+    // Decision variables: x_XA, x_XB, x_YA, x_YB
+    // Objective: Minimize cost = xCostA*x_XA + xCostB*x_XB + yCostA*x_YA + yCostB*x_YB
+    const lpProblem = {
+      name: "ProcurementLP",
+      objective: {
+        direction: glpk.GLP_MIN,
+        name: "obj",
+        vars: [
+          { name: "x_XA", coef: xCostA },
+          { name: "x_XB", coef: xCostB },
+          { name: "x_YA", coef: yCostA },
+          { name: "x_YB", coef: yCostB }
+        ]
+      },
+      subjectTo: [
+        // Demand for A: x_XA + x_YA >= totalARequired
+        {
+          name: "A_Demand",
+          vars: [
+            { name: "x_XA", coef: 1 },
+            { name: "x_YA", coef: 1 }
+          ],
+          bnds: {
+            type: glpk.GLP_LO,  // >=
+            val: totalARequired
+          }
+        },
+        // Demand for B: x_XB + x_YB >= totalBRequired
+        {
+          name: "B_Demand",
+          vars: [
+            { name: "x_XB", coef: 1 },
+            { name: "x_YB", coef: 1 }
+          ],
+          bnds: {
+            type: glpk.GLP_LO,  // >=
+            val: totalBRequired
+          }
+        },
+        // Supplier X capacity for A: x_XA <= xCapA
+        {
+          name: "X_A_Cap",
+          vars: [
+            { name: "x_XA", coef: 1 }
+          ],
+          bnds: {
+            type: glpk.GLP_UP,  // <=
+            val: xCapA
+          }
+        },
+        // Supplier X capacity for B: x_XB <= xCapB
+        {
+          name: "X_B_Cap",
+          vars: [
+            { name: "x_XB", coef: 1 }
+          ],
+          bnds: {
+            type: glpk.GLP_UP,
+            val: xCapB
+          }
+        },
+        // Supplier Y capacity for A: x_YA <= yCapA
+        {
+          name: "Y_A_Cap",
+          vars: [
+            { name: "x_YA", coef: 1 }
+          ],
+          bnds: {
+            type: glpk.GLP_UP,
+            val: yCapA
+          }
+        },
+        // Supplier Y capacity for B: x_YB <= yCapB
+        {
+          name: "Y_B_Cap",
+          vars: [
+            { name: "x_YB", coef: 1 }
+          ],
+          bnds: {
+            type: glpk.GLP_UP,
+            val: yCapB
+          }
+        }
+      ],
+      bounds: [
+        // Non-negativity
+        { name: "x_XA", type: glpk.GLP_LO, val: 0 },
+        { name: "x_XB", type: glpk.GLP_LO, val: 0 },
+        { name: "x_YA", type: glpk.GLP_LO, val: 0 },
+        { name: "x_YB", type: glpk.GLP_LO, val: 0 }
+      ]
+    };
+
+    // 4) Solve the LP with glpk.js
+    const result = glpk.solve(lpProblem);
+
+    // 5) Display the solution
+    if (result.result) {
+      // Extract variable values
+      const x_XA_val = result.result.x_XA?.toFixed(2) ?? 0;
+      const x_XB_val = result.result.x_XB?.toFixed(2) ?? 0;
+      const x_YA_val = result.result.x_YA?.toFixed(2) ?? 0;
+      const x_YB_val = result.result.x_YB?.toFixed(2) ?? 0;
+      const totalCost = result.result.z?.toFixed(2) ?? "N/A";
+
+      solutionDiv.innerHTML = `
+        <div>Optimal solution found:</div>
         <ul>
-          <li><strong>Supplier X</strong>: $10 (A), $20 (B)</li>
-          <li><strong>Supplier Y</strong>: $9 (A), $22 (B)</li>
+          <li><strong>Supplier X</strong>, Material A: ${x_XA_val} kg</li>
+          <li><strong>Supplier X</strong>, Material B: ${x_XB_val} kg</li>
+          <li><strong>Supplier Y</strong>, Material A: ${x_YA_val} kg</li>
+          <li><strong>Supplier Y</strong>, Material B: ${x_YB_val} kg</li>
         </ul>
-      </li>
-    </ul>
-    <p>The objective is to minimize the total cost of purchasing Materials A and B, while satisfying demand and capacity constraints.</p>
-  </div>
-
-  <!-- Mathematical Formulation Section -->
-  <div class="section">
-    <h2>2. Mathematical Formulation</h2>
-    <p>We define the following decision variables:</p>
-    <ul>
-      <li><code>x<sub>XA</sub></code>: kg of Material A from Supplier X</li>
-      <li><code>x<sub>XB</sub></code>: kg of Material B from Supplier X</li>
-      <li><code>x<sub>YA</sub></code>: kg of Material A from Supplier Y</li>
-      <li><code>x<sub>YB</sub></code>: kg of Material B from Supplier Y</li>
-    </ul>
-
-    <p><strong>Objective (Minimize Total Cost):</strong></p>
-    <pre>
-Minimize:
-  10 * x_XA + 20 * x_XB
-+  9 * x_YA + 22 * x_YB
-    </pre>
-
-    <p><strong>Constraints:</strong></p>
-    <ol>
-      <li><em>Material A Demand</em>: 
-        <code>x<sub>XA</sub> + x<sub>YA</sub> ≥ 2 * 1000</code> (since each product unit needs 2 kg of A)</li>
-      <li><em>Material B Demand</em>: 
-        <code>x<sub>XB</sub> + x<sub>YB</sub> ≥ 1 * 1000</code> (each unit needs 1 kg of B)</li>
-      <li><em>Supplier X Capacity</em>: 
-        <code>x<sub>XA</sub> ≤ 1600,  x<sub>XB</sub> ≤ 800</code></li>
-      <li><em>Supplier Y Capacity</em>: 
-        <code>x<sub>YA</sub> ≤ 2000,  x<sub>YB</sub> ≤ 500</code></li>
-      <li><em>Non-Negativity</em>: 
-        <code>x<sub>XA</sub>, x<sub>XB</sub>, x<sub>YA</sub>, x<sub>YB</sub> ≥ 0</code></li>
-    </ol>
-  </div>
-
-  <!-- Code Snippet Section -->
-  <div class="section">
-    <h2>3. Solving with PuLP (Python)</h2>
-    <p>Below is a sample Python script that uses the <a href="https://coin-or.github.io/pulp/" target="_blank">PuLP library</a> to solve this LP. You can copy this code into a file (e.g., <code>lp_procurement.py</code>) and run it in a Python environment with PuLP installed (<code>pip install pulp</code>).</p>
-
-    <div class="code-block">
-<pre><code># lp_procurement.py
-
-import pulp
-
-# 1) Create the LP problem
-model = pulp.LpProblem("ProcurementProblem", pulp.LpMinimize)
-
-# 2) Define Decision Variables
-x_XA = pulp.LpVariable('x_XA', lowBound=0, cat='Continuous')  # kg of A from X
-x_XB = pulp.LpVariable('x_XB', lowBound=0, cat='Continuous')  # kg of B from X
-x_YA = pulp.LpVariable('x_YA', lowBound=0, cat='Continuous')  # kg of A from Y
-x_YB = pulp.LpVariable('x_YB', lowBound=0, cat='Continuous')  # kg of B from Y
-
-# 3) Objective Function: Minimize Total Cost
-# Cost from X: 10 $/kg for A, 20 $/kg for B
-# Cost from Y:  9 $/kg for A, 22 $/kg for B
-model += 10*x_XA + 20*x_XB + 9*x_YA + 22*x_YB, "TotalCost"
-
-# 4) Constraints
-
-# 4.1 Material Demand
-model += x_XA + x_YA >= 2 * 1000, "A_Demand"
-model += x_XB + x_YB >= 1 * 1000, "B_Demand"
-
-# 4.2 Supplier Capacities
-model += x_XA <= 1600, "X_A_Capacity"
-model += x_XB <= 800,  "X_B_Capacity"
-model += x_YA <= 2000, "Y_A_Capacity"
-model += x_YB <= 500,  "Y_B_Capacity"
-
-# 4.3 Non-Negativity is implied by lowBound=0
-
-# 5) Solve the Model
-model.solve()
-
-# 6) Print the Results
-print(f"Status: {pulp.LpStatus[model.status]}")
-for var in [x_XA, x_XB, x_YA, x_YB]:
-    print(f"{var.name} = {var.varValue:.2f} kg")
-
-print(f"Minimum Total Cost = ${pulp.value(model.objective):.2f}")
-</code></pre>
-    </div>
-
-    <p>After running this script, PuLP will report the optimal solution (amount of Material A and B to buy from each supplier) and the minimum total cost.</p>
-  </div>
-
-  <!-- Instructions on Usage Section -->
-  <div class="section">
-    <h2>4. How to Run the Code</h2>
-    <ol>
-      <li>Install Python (3.x) if you haven’t already.</li>
-      <li>Install PuLP: <code>pip install pulp</code></li>
-      <li>Copy the above code into a file named <code>lp_procurement.py</code>.</li>
-      <li>Open a terminal or command prompt, navigate to the folder containing <code>lp_procurement.py</code>, and run:
-        <pre><code>python lp_procurement.py</code></pre>
-      </li>
-      <li>Check the terminal output for the solution status, decision variable values, and the minimum total cost.</li>
-    </ol>
-    <p>That’s it! You have solved a simple linear programming model for procurement optimization.</p>
-  </div>
-
-  <!-- Footer Section -->
-  <div class="section">
-    <h3>References & Further Reading</h3>
-    <ul>
-      <li><a href="https://coin-or.github.io/pulp/" target="_blank">PuLP Documentation</a></li>
-      <li><a href="https://en.wikipedia.org/wiki/Linear_programming" target="_blank">Linear Programming (Wikipedia)</a></li>
-      <li><a href="https://www.gurobi.com/resource/linear-programming-basics/" target="_blank">Linear Programming Basics (Gurobi)</a></li>
-    </ul>
-  </div>
+        <div>Minimum Total Cost: <strong>$${totalCost}</strong></div>
+      `;
+    } else {
+      // Possibly infeasible or error
+      solutionDiv.innerHTML = "<span style='color:red'>No feasible solution found.</span>";
+    }
+  });
+</script>
 
 </body>
 </html>
