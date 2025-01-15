@@ -6,91 +6,113 @@
 </head>
 <body>
 
-<h1>Minimal GLPK.js Test</h1>
+<h1>GLPK.js Minimal Test</h1>
 <p>
-  This solves a small problem:<br>
-  Minimize 5x + 6y<br>
+  This page will attempt to solve a tiny LP problem using <strong>glpk.js</strong> in the browser.<br>
+  <em>Problem to solve:</em><br>
+  Minimize: 5x + 6y<br>
   Subject to:<br>
-  x + y >= 100,<br>
-  x <= 80,<br>
-  y <= 50,<br>
+  x + y >= 100<br>
+  x <= 80<br>
+  y <= 50<br>
   x, y >= 0
 </p>
 
-<button id="solveBtn">Solve LP</button>
-<pre id="solutionArea"></pre>
-
-<!-- Load glpk.js -->
+<!-- 1) Load GLPK.js from a CDN BEFORE using it -->
 <script src="https://cdn.jsdelivr.net/npm/glpk.js@0.19.2/dist/glpk.min.js"></script>
 
+<!-- 2) Your script that references glpk -->
 <script>
-  const solveBtn = document.getElementById('solveBtn');
-  const solArea  = document.getElementById('solutionArea');
+  // We'll create a button and a <pre> area dynamically for clarity.
 
-  solveBtn.addEventListener('click', () => {
-    solArea.textContent = "Solving...";
+  // Create a button to trigger the solve
+  const solveBtn = document.createElement('button');
+  solveBtn.textContent = "Solve LP";
+  document.body.appendChild(solveBtn);
 
-    // Define a small LP in glpk.js format
-    const lp = {
-      name: "SmallLP",
-      objective: {
-        direction: glpk.GLP_MIN,
-        name: "obj",
+  // Create a <pre> element to display results
+  const resultPre = document.createElement('pre');
+  document.body.appendChild(resultPre);
+
+  // Define the small LP problem in GLPK's JSON format
+  const testProblem = {
+    name: "SmallLP",
+    objective: {
+      direction: glpk.GLP_MIN, // Minimization
+      name: "obj",
+      vars: [
+        { name: "x", coef: 5 },
+        { name: "y", coef: 6 },
+      ]
+    },
+    subjectTo: [
+      // x + y >= 100
+      {
+        name: "c1",
         vars: [
-          { name: "x", coef: 5 },
-          { name: "y", coef: 6 },
+          { name: "x", coef: 1 },
+          { name: "y", coef: 1 },
         ],
+        bnds: {
+          type: glpk.GLP_LO, // >=
+          val: 100,
+        },
       },
-      subjectTo: [
-        {
-          name: "c1",  // x + y >= 100
-          vars: [
-            { name: "x", coef: 1 },
-            { name: "y", coef: 1 },
-          ],
-          bnds: {
-            type: glpk.GLP_LO,
-            val: 100,
-          },
+      // x <= 80
+      {
+        name: "c2",
+        vars: [
+          { name: "x", coef: 1 },
+        ],
+        bnds: {
+          type: glpk.GLP_UP, // <=
+          val: 80,
         },
-        {
-          name: "c2",  // x <= 80
-          vars: [
-            { name: "x", coef: 1 },
-          ],
-          bnds: {
-            type: glpk.GLP_UP,
-            val: 80,
-          },
+      },
+      // y <= 50
+      {
+        name: "c3",
+        vars: [
+          { name: "y", coef: 1 },
+        ],
+        bnds: {
+          type: glpk.GLP_UP, // <=
+          val: 50,
         },
-        {
-          name: "c3",  // y <= 50
-          vars: [
-            { name: "y", coef: 1 },
-          ],
-          bnds: {
-            type: glpk.GLP_UP,
-            val: 50,
-          },
-        },
-      ],
-      bounds: [
-        { name: "x", type: glpk.GLP_LO, val: 0 },
-        { name: "y", type: glpk.GLP_LO, val: 0 },
-      ],
-    };
+      },
+    ],
+    // Non-negativity for x, y
+    bounds: [
+      { name: "x", type: glpk.GLP_LO, val: 0 },
+      { name: "y", type: glpk.GLP_LO, val: 0 },
+    ],
+  };
+
+  // Attach an event to the solve button
+  solveBtn.addEventListener('click', () => {
+    // Clear previous results
+    resultPre.textContent = "Solving...\n";
 
     try {
-      const result = glpk.solve(lp);
-      if (result?.result) {
-        const { x, y, z } = result.result;
-        solArea.textContent = `Optimal solution found:\n\nx = ${x}\ny = ${y}\nMin cost = ${z}`;
+      // Call the GLPK solver
+      const solution = glpk.solve(testProblem);
+
+      // If we have a result property, then it likely solved or found infeasible
+      if (solution && solution.result) {
+        const { x, y, z } = solution.result;
+        resultPre.textContent = 
+          "Solution:\n" +
+          `  x = ${x}\n` +
+          `  y = ${y}\n\n` +
+          `Objective (min cost) = ${z}`;
       } else {
-        solArea.textContent = "No feasible solution or an error occurred.";
+        // Possibly infeasible or no solution
+        resultPre.textContent = "No feasible solution or solver error.";
       }
     } catch (err) {
+      // If there's an error with glpk or the problem definition
       console.error(err);
-      solArea.textContent = "Error solving LP. Check console for details.";
+      resultPre.textContent = "Error: " + err.message;
     }
   });
 </script>
