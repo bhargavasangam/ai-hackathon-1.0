@@ -1,317 +1,100 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Interactive LP Solver (Concrete & Steel)</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 2em;
-      background-color: #f4f4f4;
-    }
-    h1 {
-      margin-bottom: 0.5em;
-    }
-    .section {
-      background: #fff;
-      margin-bottom: 1.5em;
-      padding: 1em;
-      border-radius: 5px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    }
-    .input-row {
-      margin-bottom: 0.5em;
-    }
-    label {
-      display: inline-block;
-      width: 300px;
-      font-weight: bold;
-    }
-    input[type="number"] {
-      width: 100px;
-      margin-right: 5px;
-    }
-    .solve-btn {
-      margin: 1em 0;
-      padding: 0.5em 1em;
-      font-size: 1em;
-      cursor: pointer;
-      border: 1px solid #777;
-      border-radius: 5px;
-      background: #eee;
-    }
-    textarea#solutionBox {
-      width: 100%;
-      height: 150px;
-      font-family: monospace;
-      font-size: 1em;
-      margin-top: 0.5em;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      resize: vertical;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <title>GLPK.js Minimal Test</title>
 </head>
 <body>
 
-<div class="section">
-  <h1>Interactive LP: Concrete & Steel Procurement</h1>
-  <p>
-    This example uses <strong>glpk.js</strong> to solve a small Linear Programming 
-    problem <em>in the browser</em>. You must purchase 
-    <strong>Concrete</strong> and <strong>Steel</strong> from two suppliers (X and Y) 
-    to meet demand for a final product. There’s also a site storage limit. 
-    Modify the inputs below, then click <strong>Solve LP</strong>.
-  </p>
-</div>
+<h1>Minimal GLPK.js Test</h1>
+<p>
+  This solves a small problem:<br>
+  Minimize 5x + 6y<br>
+  Subject to:<br>
+  x + y >= 100,<br>
+  x <= 80,<br>
+  y <= 50,<br>
+  x, y >= 0
+</p>
 
-<!-- Input Form -->
-<div class="section">
-  <h2>1. Model Inputs</h2>
-  
-  <!-- Demand + Materials per unit -->
-  <div class="input-row">
-    <label for="numUnits">Final Product Demand (units):</label>
-    <input type="number" id="numUnits" value="1000" min="0">
-  </div>
-  <div class="input-row">
-    <label for="concretePerProd">Concrete per product (kg/unit):</label>
-    <input type="number" id="concretePerProd" value="2" min="0">
-  </div>
-  <div class="input-row">
-    <label for="steelPerProd">Steel per product (kg/unit):</label>
-    <input type="number" id="steelPerProd" value="1" min="0">
-  </div>
+<button id="solveBtn">Solve LP</button>
+<pre id="solutionArea"></pre>
 
-  <hr>
-
-  <!-- Supplier X capacities + costs -->
-  <h3>Supplier X</h3>
-  <div class="input-row">
-    <label for="xCapConcrete">Max Concrete supply (kg):</label>
-    <input type="number" id="xCapConcrete" value="1600" min="0">
-  </div>
-  <div class="input-row">
-    <label for="xCapSteel">Max Steel supply (kg):</label>
-    <input type="number" id="xCapSteel" value="800" min="0">
-  </div>
-  <div class="input-row">
-    <label for="xCostConcrete">Cost of Concrete ($/kg):</label>
-    <input type="number" id="xCostConcrete" value="10" step="0.1" min="0">
-  </div>
-  <div class="input-row">
-    <label for="xCostSteel">Cost of Steel ($/kg):</label>
-    <input type="number" id="xCostSteel" value="20" step="0.1" min="0">
-  </div>
-
-  <hr>
-
-  <!-- Supplier Y capacities + costs -->
-  <h3>Supplier Y</h3>
-  <div class="input-row">
-    <label for="yCapConcrete">Max Concrete supply (kg):</label>
-    <input type="number" id="yCapConcrete" value="2000" min="0">
-  </div>
-  <div class="input-row">
-    <label for="yCapSteel">Max Steel supply (kg):</label>
-    <input type="number" id="yCapSteel" value="500" min="0">
-  </div>
-  <div class="input-row">
-    <label for="yCostConcrete">Cost of Concrete ($/kg):</label>
-    <input type="number" id="yCostConcrete" value="9" step="0.1" min="0">
-  </div>
-  <div class="input-row">
-    <label for="yCostSteel">Cost of Steel ($/kg):</label>
-    <input type="number" id="yCostSteel" value="22" step="0.1" min="0">
-  </div>
-
-  <hr>
-
-  <!-- Storage Capacity -->
-  <h3>On-site Storage</h3>
-  <div class="input-row">
-    <label for="siteStorage">Max total raw material storage (kg):</label>
-    <input type="number" id="siteStorage" value="3000" min="0">
-  </div>
-
-  <hr>
-
-  <button class="solve-btn" id="solveBtn">Solve LP</button>
-
-  <h3>Solution Output:</h3>
-  <textarea id="solutionBox" readonly></textarea>
-</div>
-
-<!-- glpk.js from CDN -->
+<!-- Load glpk.js -->
 <script src="https://cdn.jsdelivr.net/npm/glpk.js@0.19.2/dist/glpk.min.js"></script>
 
 <script>
-  /*
-    We'll define these variables for clarity:
-      x_XC : Concrete from Supplier X
-      x_XS : Steel    from Supplier X
-      x_YC : Concrete from Supplier Y
-      x_YS : Steel    from Supplier Y
-
-    Our objective: minimize cost =
-      (cost of Concrete X) * x_XC +
-      (cost of Steel X)    * x_XS +
-      (cost of Concrete Y) * x_YC +
-      (cost of Steel Y)    * x_YS
-
-    Constraints:
-      1) Concrete demand: x_XC + x_YC >= concretePerProd * numUnits
-      2) Steel demand:    x_XS + x_YS >= steelPerProd * numUnits
-      3) Supplier X capacity: x_XC <= xCapConcrete, x_XS <= xCapSteel
-      4) Supplier Y capacity: x_YC <= yCapConcrete, x_YS <= yCapSteel
-      5) Storage limit: x_XC + x_XS + x_YC + x_YS <= siteStorage
-      6) Non-negativity
-  */
-
-  const solveBtn     = document.getElementById('solveBtn');
-  const solutionBox  = document.getElementById('solutionBox');
+  const solveBtn = document.getElementById('solveBtn');
+  const solArea  = document.getElementById('solutionArea');
 
   solveBtn.addEventListener('click', () => {
-    // Clear old content
-    solutionBox.value = "Solving... please wait.";
+    solArea.textContent = "Solving...";
 
-    // 1) Read user inputs
-    const numUnits         = parseFloat(document.getElementById('numUnits').value);
-    const concretePerProd  = parseFloat(document.getElementById('concretePerProd').value);
-    const steelPerProd     = parseFloat(document.getElementById('steelPerProd').value);
-
-    const xCapConcrete     = parseFloat(document.getElementById('xCapConcrete').value);
-    const xCapSteel        = parseFloat(document.getElementById('xCapSteel').value);
-    const xCostConcrete    = parseFloat(document.getElementById('xCostConcrete').value);
-    const xCostSteel       = parseFloat(document.getElementById('xCostSteel').value);
-
-    const yCapConcrete     = parseFloat(document.getElementById('yCapConcrete').value);
-    const yCapSteel        = parseFloat(document.getElementById('yCapSteel').value);
-    const yCostConcrete    = parseFloat(document.getElementById('yCostConcrete').value);
-    const yCostSteel       = parseFloat(document.getElementById('yCostSteel').value);
-
-    const siteStorage      = parseFloat(document.getElementById('siteStorage').value);
-
-    // 2) Compute total needed
-    const totalConcreteRequired = concretePerProd * numUnits;
-    const totalSteelRequired    = steelPerProd * numUnits;
-
-    // 3) Build LP problem for glpk.js
-    const lpProblem = {
-      name: "ConcreteSteelProcurement",
+    // Define a small LP in glpk.js format
+    const lp = {
+      name: "SmallLP",
       objective: {
         direction: glpk.GLP_MIN,
-        name: "cost",
+        name: "obj",
         vars: [
-          { name: "x_XC", coef: xCostConcrete },
-          { name: "x_XS", coef: xCostSteel },
-          { name: "x_YC", coef: yCostConcrete },
-          { name: "x_YS", coef: yCostSteel }
-        ]
+          { name: "x", coef: 5 },
+          { name: "y", coef: 6 },
+        ],
       },
       subjectTo: [
-        // Concrete demand
         {
-          name: "ConcreteDemand",
+          name: "c1",  // x + y >= 100
           vars: [
-            { name: "x_XC", coef: 1 },
-            { name: "x_YC", coef: 1 }
+            { name: "x", coef: 1 },
+            { name: "y", coef: 1 },
           ],
           bnds: {
-            type: glpk.GLP_LO,  // >=
-            val: totalConcreteRequired
-          }
+            type: glpk.GLP_LO,
+            val: 100,
+          },
         },
-        // Steel demand
         {
-          name: "SteelDemand",
+          name: "c2",  // x <= 80
           vars: [
-            { name: "x_XS", coef: 1 },
-            { name: "x_YS", coef: 1 }
+            { name: "x", coef: 1 },
           ],
           bnds: {
-            type: glpk.GLP_LO,  // >=
-            val: totalSteelRequired
-          }
-        },
-        // Supplier X capacity
-        {
-          name: "X_ConcreteCap",
-          vars: [{ name: "x_XC", coef: 1 }],
-          bnds: { type: glpk.GLP_UP, val: xCapConcrete }
+            type: glpk.GLP_UP,
+            val: 80,
+          },
         },
         {
-          name: "X_SteelCap",
-          vars: [{ name: "x_XS", coef: 1 }],
-          bnds: { type: glpk.GLP_UP, val: xCapSteel }
-        },
-        // Supplier Y capacity
-        {
-          name: "Y_ConcreteCap",
-          vars: [{ name: "x_YC", coef: 1 }],
-          bnds: { type: glpk.GLP_UP, val: yCapConcrete }
-        },
-        {
-          name: "Y_SteelCap",
-          vars: [{ name: "x_YS", coef: 1 }],
-          bnds: { type: glpk.GLP_UP, val: yCapSteel }
-        },
-        // Storage capacity
-        {
-          name: "StorageLimit",
+          name: "c3",  // y <= 50
           vars: [
-            { name: "x_XC", coef: 1 },
-            { name: "x_XS", coef: 1 },
-            { name: "x_YC", coef: 1 },
-            { name: "x_YS", coef: 1 }
+            { name: "y", coef: 1 },
           ],
           bnds: {
-            type: glpk.GLP_UP, // <=
-            val: siteStorage
-          }
-        }
+            type: glpk.GLP_UP,
+            val: 50,
+          },
+        },
       ],
       bounds: [
-        // Non-negativity
-        { name: "x_XC", type: glpk.GLP_LO, val: 0 },
-        { name: "x_XS", type: glpk.GLP_LO, val: 0 },
-        { name: "x_YC", type: glpk.GLP_LO, val: 0 },
-        { name: "x_YS", type: glpk.GLP_LO, val: 0 }
-      ]
+        { name: "x", type: glpk.GLP_LO, val: 0 },
+        { name: "y", type: glpk.GLP_LO, val: 0 },
+      ],
     };
 
-    // 4) Solve the LP
-    let result;
     try {
-      result = glpk.solve(lpProblem);
+      const result = glpk.solve(lp);
+      if (result?.result) {
+        const { x, y, z } = result.result;
+        solArea.textContent = `Optimal solution found:\n\nx = ${x}\ny = ${y}\nMin cost = ${z}`;
+      } else {
+        solArea.textContent = "No feasible solution or an error occurred.";
+      }
     } catch (err) {
-      console.error("GLPK solve error:", err);
-      solutionBox.value = "Error solving the LP problem. Check the console for details.";
-      return;
-    }
-
-    // 5) Display results
-    if (result && result.result) {
-      const x_XC_val = result.result.x_XC?.toFixed(2) || "0";
-      const x_XS_val = result.result.x_XS?.toFixed(2) || "0";
-      const x_YC_val = result.result.x_YC?.toFixed(2) || "0";
-      const x_YS_val = result.result.x_YS?.toFixed(2) || "0";
-      const totalCost = (result.result.z || 0).toFixed(2);
-
-      solutionBox.value =
-        "Optimal Purchase Plan:\n\n" +
-        `Supplier X:\n` +
-        `  Concrete = ${x_XC_val} kg\n` +
-        `  Steel    = ${x_XS_val} kg\n\n` +
-        `Supplier Y:\n` +
-        `  Concrete = ${x_YC_val} kg\n` +
-        `  Steel    = ${x_YS_val} kg\n\n` +
-        `Minimum Total Cost = $${totalCost}`;
-    } else {
-      solutionBox.value = "No feasible solution found or an error occurred.";
+      console.error(err);
+      solArea.textContent = "Error solving LP. Check console for details.";
     }
   });
 </script>
 
 </body>
 </html>
+
