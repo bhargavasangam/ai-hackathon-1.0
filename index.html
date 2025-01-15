@@ -1,50 +1,172 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8" />
-    <title>AI hackathon</title>
+  <meta charset="UTF-8" />
+  <title>Linear Programming Example: Procurement Problem</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f9f9f9;
+    }
+    h1, h2, h3 {
+      margin-bottom: 0.5em;
+    }
+    .code-block {
+      background: #eee;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: "Courier New", monospace;
+      overflow-x: auto;
+    }
+    .section {
+      background: #fff;
+      margin-bottom: 20px;
+      padding: 15px;
+      border-radius: 5px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+  </style>
 </head>
 <body>
-    <h1>Linear programming</h1>
-    <p>Linear Programming is an optimization technique that aims to maximize or minimize a linear objective function subject to linear constraints</p>
-    <p>Objective Function: A linear function we want to optimize (e.g., minimize cost).
-Decision Variables: Values we can adjust (e.g., how many units of material to buy from each supplier).
-Constraints: Linear inequalities or equalities that limit our decisions (e.g., supply capacity, storage limits).</p>
-    <p>Demand</p>
-<p>Concrete demand: 500 units total over the project timeline.
-Steel demand: 300 units total over the project timeline.</p>
-<p>Costs</p>
-<p>Cost of Concrete from Supplier A: $50 per unit.
-Cost of Concrete from Supplier B: $55 per unit.
-Cost of Steel from Supplier A: $100 per unit.
-Cost of Steel from Supplier B: $95 per unit.</p>
-<p>Supplier Capacity</p>
-<p>Supplier A can provide up to 400 units of Concrete and 200 units of Steel.
-Supplier B can provide up to 300 units of Concrete and 300 units of Steel.</p>
-<p>Additional Constraints</p>
-<p>Storage Limit: The site can hold a maximum of 600 total units of material (concrete + steel) at any given time.
-Project Demand Must Be Met: Must meet or exceed the total demand for each material.</p>
-    <p>Textbooks & Foundational Works</p>
 
-       <p> Hillier, F. S., & Lieberman, G. J. (2021). Introduction to Operations Research (11th Ed.). McGraw-Hill.
-        A classic textbook covering the foundations of linear programming, duality, sensitivity analysis, and more.
-        
-        Winston, W. L. (2004). Operations Research: Applications and Algorithms (4th Ed.). Duxbury Press.
-        Offers practical examples and in-depth explanations of LP formulations and solutions.</p>
-    <p>Arshinder, Kanda, & Deshmukh (2008). “Supply chain coordination: Perspectives, empirical studies and research directions.” International Journal of Production Economics, 115(2), 316–335.
-Discusses coordination mechanisms in supply chains, relevant for understanding how procurement optimization fits into a broader system.
-Lu, S., & Li, H. (2003). “Resource-activity critical path method for construction planning.” Construction Management and Economics, 21(2), 157–164.
-Shows how resource constraints tie into construction scheduling, linking LP-like methods to real-world project planning.</p>
-    <p>Online Libraries</p>
+  <!-- Title Section -->
+  <div class="section">
+    <h1>Linear Programming Example</h1>
+    <p>This page illustrates a simple Linear Programming (LP) problem for a procurement scenario, showing how to model and solve it using the PuLP library in Python.</p>
+  </div>
 
-<p>PuLP Documentation:</p>
-<p>https://coin-or.github.io/pulp/
-A Python library for Linear Programming; easy to install and get started.</p>
-<p>OR-Tools by Google:</p>
-<p>https://developers.google.com/optimization
-Offers powerful solvers for LP, Mixed Integer Programming, and more.</p>
-<p>Pyomo Documentation:</p>
-<p>https://pyomo.readthedocs.io/en/stable/
-Another Python-based optimization modeling framework.</p>
+  <!-- Problem Statement Section -->
+  <div class="section">
+    <h2>1. Problem Statement</h2>
+    <p>Our small manufacturing company needs two raw materials (A and B) to produce a final product. We have two suppliers (X and Y) for each material, each with specific costs and capacity limits.</p>
+    
+    <ul>
+      <li>We must produce at least <strong>1,000 units</strong> of the final product each month.</li>
+      <li>Each unit of the product requires <strong>2 kg</strong> of Material A and <strong>1 kg</strong> of Material B.</li>
+      <li>Supplier X can provide up to <strong>1,600 kg of Material A</strong> and <strong>800 kg of Material B</strong>.</li>
+      <li>Supplier Y can provide up to <strong>2,000 kg of Material A</strong> and <strong>500 kg of Material B</strong>.</li>
+      <li>Costs per kg:
+        <ul>
+          <li><strong>Supplier X</strong>: $10 (A), $20 (B)</li>
+          <li><strong>Supplier Y</strong>: $9 (A), $22 (B)</li>
+        </ul>
+      </li>
+    </ul>
+    <p>The objective is to minimize the total cost of purchasing Materials A and B, while satisfying demand and capacity constraints.</p>
+  </div>
+
+  <!-- Mathematical Formulation Section -->
+  <div class="section">
+    <h2>2. Mathematical Formulation</h2>
+    <p>We define the following decision variables:</p>
+    <ul>
+      <li><code>x<sub>XA</sub></code>: kg of Material A from Supplier X</li>
+      <li><code>x<sub>XB</sub></code>: kg of Material B from Supplier X</li>
+      <li><code>x<sub>YA</sub></code>: kg of Material A from Supplier Y</li>
+      <li><code>x<sub>YB</sub></code>: kg of Material B from Supplier Y</li>
+    </ul>
+
+    <p><strong>Objective (Minimize Total Cost):</strong></p>
+    <pre>
+Minimize:
+  10 * x_XA + 20 * x_XB
++  9 * x_YA + 22 * x_YB
+    </pre>
+
+    <p><strong>Constraints:</strong></p>
+    <ol>
+      <li><em>Material A Demand</em>: 
+        <code>x<sub>XA</sub> + x<sub>YA</sub> ≥ 2 * 1000</code> (since each product unit needs 2 kg of A)</li>
+      <li><em>Material B Demand</em>: 
+        <code>x<sub>XB</sub> + x<sub>YB</sub> ≥ 1 * 1000</code> (each unit needs 1 kg of B)</li>
+      <li><em>Supplier X Capacity</em>: 
+        <code>x<sub>XA</sub> ≤ 1600,  x<sub>XB</sub> ≤ 800</code></li>
+      <li><em>Supplier Y Capacity</em>: 
+        <code>x<sub>YA</sub> ≤ 2000,  x<sub>YB</sub> ≤ 500</code></li>
+      <li><em>Non-Negativity</em>: 
+        <code>x<sub>XA</sub>, x<sub>XB</sub>, x<sub>YA</sub>, x<sub>YB</sub> ≥ 0</code></li>
+    </ol>
+  </div>
+
+  <!-- Code Snippet Section -->
+  <div class="section">
+    <h2>3. Solving with PuLP (Python)</h2>
+    <p>Below is a sample Python script that uses the <a href="https://coin-or.github.io/pulp/" target="_blank">PuLP library</a> to solve this LP. You can copy this code into a file (e.g., <code>lp_procurement.py</code>) and run it in a Python environment with PuLP installed (<code>pip install pulp</code>).</p>
+
+    <div class="code-block">
+<pre><code># lp_procurement.py
+
+import pulp
+
+# 1) Create the LP problem
+model = pulp.LpProblem("ProcurementProblem", pulp.LpMinimize)
+
+# 2) Define Decision Variables
+x_XA = pulp.LpVariable('x_XA', lowBound=0, cat='Continuous')  # kg of A from X
+x_XB = pulp.LpVariable('x_XB', lowBound=0, cat='Continuous')  # kg of B from X
+x_YA = pulp.LpVariable('x_YA', lowBound=0, cat='Continuous')  # kg of A from Y
+x_YB = pulp.LpVariable('x_YB', lowBound=0, cat='Continuous')  # kg of B from Y
+
+# 3) Objective Function: Minimize Total Cost
+# Cost from X: 10 $/kg for A, 20 $/kg for B
+# Cost from Y:  9 $/kg for A, 22 $/kg for B
+model += 10*x_XA + 20*x_XB + 9*x_YA + 22*x_YB, "TotalCost"
+
+# 4) Constraints
+
+# 4.1 Material Demand
+model += x_XA + x_YA >= 2 * 1000, "A_Demand"
+model += x_XB + x_YB >= 1 * 1000, "B_Demand"
+
+# 4.2 Supplier Capacities
+model += x_XA <= 1600, "X_A_Capacity"
+model += x_XB <= 800,  "X_B_Capacity"
+model += x_YA <= 2000, "Y_A_Capacity"
+model += x_YB <= 500,  "Y_B_Capacity"
+
+# 4.3 Non-Negativity is implied by lowBound=0
+
+# 5) Solve the Model
+model.solve()
+
+# 6) Print the Results
+print(f"Status: {pulp.LpStatus[model.status]}")
+for var in [x_XA, x_XB, x_YA, x_YB]:
+    print(f"{var.name} = {var.varValue:.2f} kg")
+
+print(f"Minimum Total Cost = ${pulp.value(model.objective):.2f}")
+</code></pre>
+    </div>
+
+    <p>After running this script, PuLP will report the optimal solution (amount of Material A and B to buy from each supplier) and the minimum total cost.</p>
+  </div>
+
+  <!-- Instructions on Usage Section -->
+  <div class="section">
+    <h2>4. How to Run the Code</h2>
+    <ol>
+      <li>Install Python (3.x) if you haven’t already.</li>
+      <li>Install PuLP: <code>pip install pulp</code></li>
+      <li>Copy the above code into a file named <code>lp_procurement.py</code>.</li>
+      <li>Open a terminal or command prompt, navigate to the folder containing <code>lp_procurement.py</code>, and run:
+        <pre><code>python lp_procurement.py</code></pre>
+      </li>
+      <li>Check the terminal output for the solution status, decision variable values, and the minimum total cost.</li>
+    </ol>
+    <p>That’s it! You have solved a simple linear programming model for procurement optimization.</p>
+  </div>
+
+  <!-- Footer Section -->
+  <div class="section">
+    <h3>References & Further Reading</h3>
+    <ul>
+      <li><a href="https://coin-or.github.io/pulp/" target="_blank">PuLP Documentation</a></li>
+      <li><a href="https://en.wikipedia.org/wiki/Linear_programming" target="_blank">Linear Programming (Wikipedia)</a></li>
+      <li><a href="https://www.gurobi.com/resource/linear-programming-basics/" target="_blank">Linear Programming Basics (Gurobi)</a></li>
+    </ul>
+  </div>
+
 </body>
 </html>
+
