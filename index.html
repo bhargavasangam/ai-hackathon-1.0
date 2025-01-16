@@ -1,122 +1,284 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>GLPK.js Minimal Test</title>
+  <meta charset="UTF-8">
+  <title>LP: Cement & Steel Procurement (GLPK.js)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2em;
+      background-color: #f4f4f4;
+    }
+    h1, h2 {
+      margin-bottom: 0.5em;
+    }
+    .section {
+      background: #fff;
+      margin-bottom: 1.5em;
+      padding: 1em;
+      border-radius: 5px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    button {
+      margin: 1em 0;
+      padding: 0.5em 1em;
+      font-size: 1em;
+      cursor: pointer;
+      border: 1px solid #777;
+      border-radius: 5px;
+      background: #eee;
+    }
+    textarea#solutionBox {
+      width: 100%;
+      height: 200px;
+      font-family: monospace;
+      font-size: 0.95em;
+      margin-top: 0.5em;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      resize: vertical;
+    }
+    .notes {
+      font-size: 0.9em;
+      color: #555;
+      margin-top: 1em;
+    }
+  </style>
 </head>
 <body>
 
-<h1>GLPK.js Minimal Test</h1>
-<p>
-  This page will attempt to solve a tiny LP problem using <strong>glpk.js</strong> in the browser.<br>
-  <em>Problem to solve:</em><br>
-  Minimize: 5x + 6y<br>
-  Subject to:<br>
-  x + y >= 100<br>
-  x <= 80<br>
-  y <= 50<br>
-  x, y >= 0
-</p>
+<div class="section">
+  <h1>Cement & Steel Procurement using Linear Programming</h1>
+  <p>
+    We need <strong>1500 tons of cement</strong> and <strong>900 tons of steel</strong> 
+    for a construction project. We have three suppliers (<strong>A, B, C</strong>), 
+    each with specific <em>capacity</em> and <em>cost</em> constraints:
+  </p>
+  <ul>
+    <li><strong>Supplier A</strong>: 
+      <em>Max Cement</em> = 500 tons at \$70/ton, 
+      <em>Max Steel</em> = 200 tons at \$120/ton
+    </li>
+    <li><strong>Supplier B</strong>: 
+      <em>Max Cement</em> = 400 tons at \$75/ton, 
+      <em>Max Steel</em> = 300 tons at \$115/ton
+    </li>
+    <li><strong>Supplier C</strong>: 
+      <em>Max Cement</em> = 600 tons at \$72/ton, 
+      <em>Max Steel</em> = 250 tons at \$125/ton
+    </li>
+  </ul>
+  <p>
+    Additionally, the construction site can store up to <strong>1000 total tons</strong> of raw materials (cement + steel) at any time. 
+    The goal is to <strong>minimize total cost</strong> while meeting (or exceeding) the demand.
+  </p>
+</div>
 
-<!-- 1) Load GLPK.js from a CDN BEFORE using it -->
+<div class="section">
+  <h2>Solve the LP in your browser</h2>
+  <button id="solveBtn">Solve LP</button>
+  <h3>Solution Output:</h3>
+  <textarea id="solutionBox" readonly></textarea>
+</div>
+
+<!-- 1) Load GLPK.js from a CDN (before our script) -->
 <script src="https://cdn.jsdelivr.net/npm/glpk.js@0.19.2/dist/glpk.min.js"></script>
 
-<!-- 2) Your script that references glpk -->
 <script>
-  // We'll create a button and a <pre> area dynamically for clarity.
+  /*
+    We'll define 6 decision variables:
+      xAC = Cement from Supplier A
+      xAS = Steel  from Supplier A
+      xBC = Cement from Supplier B
+      xBS = Steel  from Supplier B
+      xCC = Cement from Supplier C
+      xCS = Steel  from Supplier C
 
-  // Create a button to trigger the solve
-  const solveBtn = document.createElement('button');
-  solveBtn.textContent = "Solve LP";
-  document.body.appendChild(solveBtn);
+    Objective (Minimize Cost):
+      70*xAC + 120*xAS
+    +  75*xBC + 115*xBS
+    +  72*xCC + 125*xCS
 
-  // Create a <pre> element to display results
-  const resultPre = document.createElement('pre');
-  document.body.appendChild(resultPre);
+    Constraints:
+      1) Cement Demand: xAC + xBC + xCC >= 1500
+      2) Steel  Demand: xAS + xBS + xCS >= 900
 
-  // Define the small LP problem in GLPK's JSON format
-  const testProblem = {
-    name: "SmallLP",
-    objective: {
-      direction: glpk.GLP_MIN, // Minimization
-      name: "obj",
-      vars: [
-        { name: "x", coef: 5 },
-        { name: "y", coef: 6 },
-      ]
-    },
-    subjectTo: [
-      // x + y >= 100
-      {
-        name: "c1",
-        vars: [
-          { name: "x", coef: 1 },
-          { name: "y", coef: 1 },
-        ],
-        bnds: {
-          type: glpk.GLP_LO, // >=
-          val: 100,
-        },
-      },
-      // x <= 80
-      {
-        name: "c2",
-        vars: [
-          { name: "x", coef: 1 },
-        ],
-        bnds: {
-          type: glpk.GLP_UP, // <=
-          val: 80,
-        },
-      },
-      // y <= 50
-      {
-        name: "c3",
-        vars: [
-          { name: "y", coef: 1 },
-        ],
-        bnds: {
-          type: glpk.GLP_UP, // <=
-          val: 50,
-        },
-      },
-    ],
-    // Non-negativity for x, y
-    bounds: [
-      { name: "x", type: glpk.GLP_LO, val: 0 },
-      { name: "y", type: glpk.GLP_LO, val: 0 },
-    ],
-  };
+      3) Supplier A capacity: xAC <= 500,  xAS <= 200
+      4) Supplier B capacity: xBC <= 400,  xBS <= 300
+      5) Supplier C capacity: xCC <= 600,  xCS <= 250
 
-  // Attach an event to the solve button
+      6) Storage Limit:
+         xAC + xAS + xBC + xBS + xCC + xCS <= 1000
+
+      7) Non-negativity: all x >= 0
+  */
+
+  const solveBtn    = document.getElementById('solveBtn');
+  const solutionBox = document.getElementById('solutionBox');
+
   solveBtn.addEventListener('click', () => {
-    // Clear previous results
-    resultPre.textContent = "Solving...\n";
+    solutionBox.value = "Solving... please wait.";
 
+    // Build the LP problem in GLPK.js format
+    const lpProblem = {
+      name: "CementSteel",
+      objective: {
+        direction: glpk.GLP_MIN,
+        name: "totalCost",
+        vars: [
+          { name: "xAC", coef: 70 },
+          { name: "xAS", coef: 120 },
+          { name: "xBC", coef: 75 },
+          { name: "xBS", coef: 115 },
+          { name: "xCC", coef: 72 },
+          { name: "xCS", coef: 125 }
+        ]
+      },
+      subjectTo: [
+        // 1) Cement Demand
+        {
+          name: "CementDemand",
+          vars: [
+            { name: "xAC", coef: 1 },
+            { name: "xBC", coef: 1 },
+            { name: "xCC", coef: 1 }
+          ],
+          bnds: {
+            type: glpk.GLP_LO, // >=
+            val: 1500
+          }
+        },
+        // 2) Steel Demand
+        {
+          name: "SteelDemand",
+          vars: [
+            { name: "xAS", coef: 1 },
+            { name: "xBS", coef: 1 },
+            { name: "xCS", coef: 1 }
+          ],
+          bnds: {
+            type: glpk.GLP_LO,
+            val: 900
+          }
+        },
+        // 3) Supplier A capacity
+        {
+          name: "A_CementCap",
+          vars: [{ name: "xAC", coef: 1 }],
+          bnds: { type: glpk.GLP_UP, val: 500 }
+        },
+        {
+          name: "A_SteelCap",
+          vars: [{ name: "xAS", coef: 1 }],
+          bnds: { type: glpk.GLP_UP, val: 200 }
+        },
+        // 4) Supplier B capacity
+        {
+          name: "B_CementCap",
+          vars: [{ name: "xBC", coef: 1 }],
+          bnds: { type: glpk.GLP_UP, val: 400 }
+        },
+        {
+          name: "B_SteelCap",
+          vars: [{ name: "xBS", coef: 1 }],
+          bnds: { type: glpk.GLP_UP, val: 300 }
+        },
+        // 5) Supplier C capacity
+        {
+          name: "C_CementCap",
+          vars: [{ name: "xCC", coef: 1 }],
+          bnds: { type: glpk.GLP_UP, val: 600 }
+        },
+        {
+          name: "C_SteelCap",
+          vars: [{ name: "xCS", coef: 1 }],
+          bnds: { type: glpk.GLP_UP, val: 250 }
+        },
+        // 6) Storage Limit
+        {
+          name: "StorageLimit",
+          vars: [
+            { name: "xAC", coef: 1 },
+            { name: "xAS", coef: 1 },
+            { name: "xBC", coef: 1 },
+            { name: "xBS", coef: 1 },
+            { name: "xCC", coef: 1 },
+            { name: "xCS", coef: 1 },
+          ],
+          bnds: {
+            type: glpk.GLP_UP, // <=
+            val: 1000
+          }
+        }
+      ],
+      bounds: [
+        // 7) Non-negativity
+        { name: "xAC", type: glpk.GLP_LO, val: 0 },
+        { name: "xAS", type: glpk.GLP_LO, val: 0 },
+        { name: "xBC", type: glpk.GLP_LO, val: 0 },
+        { name: "xBS", type: glpk.GLP_LO, val: 0 },
+        { name: "xCC", type: glpk.GLP_LO, val: 0 },
+        { name: "xCS", type: glpk.GLP_LO, val: 0 }
+      ]
+    };
+
+    // Solve with GLPK
+    let result;
     try {
-      // Call the GLPK solver
-      const solution = glpk.solve(testProblem);
-
-      // If we have a result property, then it likely solved or found infeasible
-      if (solution && solution.result) {
-        const { x, y, z } = solution.result;
-        resultPre.textContent = 
-          "Solution:\n" +
-          `  x = ${x}\n` +
-          `  y = ${y}\n\n` +
-          `Objective (min cost) = ${z}`;
-      } else {
-        // Possibly infeasible or no solution
-        resultPre.textContent = "No feasible solution or solver error.";
-      }
+      result = glpk.solve(lpProblem);
     } catch (err) {
-      // If there's an error with glpk or the problem definition
-      console.error(err);
-      resultPre.textContent = "Error: " + err.message;
+      console.error("GLPK solve error:", err);
+      solutionBox.value = "Error solving LP. Check console.";
+      return;
+    }
+
+    if (result && result.result) {
+      // Extract decision variables
+      const r = result.result;
+      const xAC = r.xAC?.toFixed(2) || "0";
+      const xAS = r.xAS?.toFixed(2) || "0";
+      const xBC = r.xBC?.toFixed(2) || "0";
+      const xBS = r.xBS?.toFixed(2) || "0";
+      const xCC = r.xCC?.toFixed(2) || "0";
+      const xCS = r.xCS?.toFixed(2) || "0";
+      const minCost = (r.z || 0).toFixed(2);
+
+      solutionBox.value =
+        "Optimal Procurement:\n\n" +
+        `Supplier A: Cement = ${xAC} tons, Steel = ${xAS} tons\n` +
+        `Supplier B: Cement = ${xBC} tons, Steel = ${xBS} tons\n` +
+        `Supplier C: Cement = ${xCC} tons, Steel = ${xCS} tons\n\n` +
+        "Total Cost = $" + minCost;
+    } else {
+      solutionBox.value = "No feasible solution found or an error occurred.";
     }
   });
 </script>
 
+<div class="section notes">
+  <strong>Extending to Multi-Period & Dynamic Storage:</strong>
+  <p>
+    In a multi-period model, you would define variables for each period, e.g. 
+    <code>xAC<sub>t</sub></code> meaning "Cement from Supplier A in period t". 
+    Each constraint (demand, capacity, storage) would apply <em>per period</em> or 
+    cumulatively. For example, you might have:
+  </p>
+  <pre>
+// For each t in 1..T:
+  xAC_t + xBC_t + xCC_t >= Demand_t (cement)
+  xAS_t + xBS_t + xCS_t >= Demand_t (steel)
+  ...
+  Inventory_(t) = Inventory_(t-1) + SumOfPurchases_t - SumOfUsage_t
+  Inventory_t <= MaxStorage
+  ...
+</pre>
+  <p>
+    This approach allows you to model deliveries, usage, and 
+    changing storage constraints <em>across time steps</em>. The LP size grows 
+    (6 variables * T periods, plus additional constraints), but the principle 
+    remains the same.
+  </p>
+</div>
+
 </body>
 </html>
-
